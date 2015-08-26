@@ -15,7 +15,9 @@ export
 	plot1,
 	p1,
 	plot2,
-	p2
+	p2,
+	plotpm,
+	ppm
 
 @doc """
 plot1(::Array{SACtr})
@@ -72,6 +74,38 @@ plot2(s::SACtr) = plot2([s])
 p2 = plot2
 
 @doc """
+plotpm(::Array{SACtr}; xlim=[None, None])
+
+	Plot the particle motion for a pair of orthogonal components, within
+	the time window xlim[1] to xlim[2] if provided
+""" ->
+function plotpm(a::Array{SACtr}; xlim=[None, None])
+	const angle_tol = 0.1
+	length(a) == 2 || error("plotpm: Can only plot two components")
+	angle = (a[1].cmpaz - a[2].cmpaz)%360.
+	abs(angle) - 90. > eps(angle) && abs(angle) - 270. > eps(angle) &&
+		error("plotpm: Components must be orthogonal")
+	# Find out whether trace 1 is clockwise of 2, or vice versa
+	if abs(angle) - 90. <= angle_tol
+		t1, t2 = a[1], a[2]
+	else
+		t1, t2 = a[2], a[1]
+	end
+	PyPlot.clf()
+	_, _, min, max = lims([t1, t2])
+	PyPlot.plot(t1.t, t2.t)
+	PyPlot.xlim(min, max)
+	PyPlot.ylim(min, max)
+	PyPlot.xlabel(strip(t1.kcmpnm) * " (" * string(t1.cmpaz) * ")")
+	PyPlot.ylabel(strip(t2.kcmpnm) * " (" * string(t2.cmpaz) * ")")
+	return
+end
+
+plotpm(s1::SACtr, s2::SACtr; xlim=[None, None]) = plotpm([s1, s2]; xlim=xlim)
+ppm = plotpm
+
+
+@doc """
 lims(::Array{SACtr}) -> b, e
 
 	Get the minimum and maximum times, b and e, for an array of SAC traces
@@ -90,5 +124,8 @@ function lims(a::Array{SACtr})
 	end
 	return b, e, depmin, depmax
 end
+
+lims(s::SACtr) = lims([s])
+
 
 end # module SACPlot
