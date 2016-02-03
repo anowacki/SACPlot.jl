@@ -34,27 +34,35 @@ Define limits in time with `xlim`
 Define dependent variable axis limits with `ylim`, which can be a 2-array
 of values, or \"all\" to set all axes to have the same automatic limits.
 """ ->
-function plot1(a::Array{SACtr}; xlim=[None, None], ylim=None)
+function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN])
 	# Check arguments
-	length(xlim) == 2 || error("xlim must be length-2 array of numbers")
-	if xlim[1] != None && xlim[2] != None
-		xlim[2] > xlim[1] || error("Lower xlim value must be less than upper")
-	end
+	check_lims(xlim, "SACPlot.plot1")
+	typeof(ylim) <: AbstractString || check_lims(ylim, "SACPlot.plot1")
 	# Make plots
 	PyPlot.clf()
 	n = length(a)
-	b, e = lims(a)
-	if xlim[1] != None; b = xlim[1]; end
-	if xlim[2] != None; e = xlim[2]; end
+	b, e, depmin, depmax = lims(a)
+	if ! isnan(xlim[1]); b = xlim[1]; end
+	if ! isnan(xlim[2]); e = xlim[2]; end
+	if ! (typeof(ylim) <: AbstractString)
+		if ! isnan(ylim[1]); depmin = ylim[1]; end
+		if ! isnan(ylim[2]); depmax = ylim[2]; end
+	end
 	# Turn off x labels for all but bottom trace
 	for i = 1:n
 		PyPlot.subplot(n, 1, i)
 		PyPlot.plot(SAC.time(a[i]), a[i].t)
 		PyPlot.xlim([b, e])
+		if typeof(ylim) <: AbstractString
+			if lowercase(ylim) == "all" PyPlot.ylim([depmin, depmax]) end
+		elseif ! all(isnan(ylim))
+			PyPlot.ylim([depmin, depmax])
+		end
 	end
 	ticks = PyPlot.xticks()
 	# PyPlot.xticks(ticks[1])
 	PyPlot.subplots_adjust(hspace=0.)
+	PyPlot.tight_layout()
 	return
 end
 
