@@ -1,3 +1,6 @@
+"""
+SACPlot.jl provides routines for plotting SAC traces.
+"""
 module SACPlot
 # Module for plotting SAC traces
 
@@ -20,9 +23,14 @@ export
 	ppm
 
 @doc """
-plot1(::Array{SACtr})
+`plot1(::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN])`
 
-   Create a plot of the SAC trace(s) `s`
+Create a plot of the SAC trace(s) `s`.
+
+Define limits in time with `xlim`
+
+Define dependent variable axis limits with `ylim`, which can be a 2-array
+of values, or \"all\" to set all axes to have the same automatic limits.
 """ ->
 function plot1(a::Array{SACtr}; xlim=[None, None], ylim=None)
 	# Check arguments
@@ -54,9 +62,9 @@ plot1(s::SACtr) = plot1([s])
 p1 = plot1
 
 @doc """
-plot2(::Array{SACtr})
+`plot2(::Array{SACtr})`
 
-	Plot all traces in array of SAC traces `a` on the same plot
+Plot all traces in array of SAC traces `a` on the same plot
 """ ->
 function plot2(a::Array{SACtr})
 	PyPlot.clf()
@@ -74,10 +82,10 @@ plot2(s::SACtr) = plot2([s])
 p2 = plot2
 
 @doc """
-plotpm(::Array{SACtr}; xlim=[None, None])
+`plotpm(::Array{SACtr}; xlim=[NaN, NaN])`
 
-	Plot the particle motion for a pair of orthogonal components, within
-	the time window xlim[1] to xlim[2] if provided
+Plot the particle motion for a pair of orthogonal components, within
+the time window `xlim[1]` to `xlim[2]` if provided
 """ ->
 function plotpm(a::Array{SACtr}; xlim=[None, None])
 	const angle_tol = 0.1
@@ -106,9 +114,9 @@ ppm = plotpm
 
 
 @doc """
-lims(::Array{SACtr}) -> b, e
+`lims(::Array{SACtr}) -> b, e`
 
-	Get the minimum and maximum times, b and e, for an array of SAC traces
+Get the minimum and maximum times, `b` and `e`, for an array of SAC traces
 """ ->
 function lims(a::Array{SACtr})
 	n = length(a)
