@@ -60,9 +60,7 @@ function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN])
 		end
 	end
 	ticks = PyPlot.xticks()
-	# PyPlot.xticks(ticks[1])
 	PyPlot.subplots_adjust(hspace=0.)
-	PyPlot.tight_layout()
 	return
 end
 
@@ -142,7 +140,7 @@ function plotsp(f::Array{Array, 1}, S::Array{Array, 1}, kind="amp";
 	check_lims(ylim, "SACPlot.plotsp")
     
 end
-
+psp = plotsp
 
 @doc """
 `lims(::Array{SACtr}) -> b, e`
