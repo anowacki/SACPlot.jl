@@ -25,7 +25,7 @@ export
 	psp
 
 @doc """
-`plot1(::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN])`
+`plot1(::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default)`
 
 Create a plot of the SAC trace(s) `s`.
 
@@ -33,11 +33,22 @@ Define limits in time with `xlim`
 
 Define dependent variable axis limits with `ylim`, which can be a 2-array
 of values, or \"all\" to set all axes to have the same automatic limits.
+
+Define the text labels with an array of sumbols, which correspond to the names
+of SAC headers.
 """ ->
-function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN])
+function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default)
 	# Check arguments
 	check_lims(xlim, "SACPlot.plot1")
 	typeof(ylim) <: AbstractString || check_lims(ylim, "SACPlot.plot1")
+    # Make sure any single label is in an array
+    typeof(label) == Symbol && (label = [label])
+    for l in label
+        if l != :default
+            l in [:kzdate, :kztime] && continue # Special labels
+            l in fieldnames(a[1]) || error("Label header '$l' is not a valid header variable")
+        end
+    end
 	# Make plots
 	PyPlot.clf()
 	n = length(a)
@@ -58,9 +69,35 @@ function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN])
 		elseif ! all(isnan(ylim))
 			PyPlot.ylim([depmin, depmax])
 		end
+        # Add text annotation
+        y1, y2 = PyPlot.ylim()
+        if label != :nothing
+            if :default in label
+                if all(Bool[getfield(a[i], f) != SAC.sac_inull for f in [:nzyear, :nzhour, :nzmin, :nzsec, :nzmsec]])
+                    date = Date(Date(0) + Dates.Year(a[i].nzyear) + Dates.Day(a[i].nzjday))
+                    day = string(Dates.dayofmonth(date))
+                    month = Dates.monthname(date)[1:3]
+                else
+                    day = month = "?"
+                end
+                label_string = strip(a[i].kevnm)*"\n"*strip(a[i].kstnm)*"."*
+                               strip(a[i].knetwk)*"."*strip(a[i].kcmpnm) * "\n" *
+                         @sprintf("%04d.%03dT%02d:%02d:%02d:%03d (%s %s)", a[i].nzyear,
+                                  a[i].nzjday, a[i].nzhour, a[i].nzmin, a[i].nzsec,
+                                  a[i].nzmsec, day, month)
+            else
+                label_string = ""
+                for l in label
+                    label_string *= string(l) * ": " * strip(string(getfield(a[i], l))) * "\n"
+                end
+            end
+            PyPlot.text(b+0.97*(e-b), y1+0.95*(y2-y1), label_string,
+                        horizontalalignment="right", verticalalignment="top",
+                        fontsize=10)
+        end
 	end
 	ticks = PyPlot.xticks()
-	PyPlot.subplots_adjust(hspace=0.)
+    PyPlot.subplots_adjust(hspace=0.)
 	return
 end
 
