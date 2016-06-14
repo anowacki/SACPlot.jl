@@ -8,17 +8,17 @@ module.
 
 
 ## How to install
-Although not registered as an official package, SACPlot.jl can be added to your
+First install the unregistered package SAC.jl:
+
+```julia
+Pkg.clone("https://github.com/anowacki/SAC.jl")
+```
+
+Then SACPlot.jl can be added to your
 Julia install like so:
 
 ```julia
 Pkg.clone("https://github.com/anowacki/SACPlot.jl")
-```
-
-You also need to install the unregistered package SAC.jl:
-
-```julia
-Pkg.clone("https://github.com/anowacki/SAC.jl")
 ```
 
 You then need only do
