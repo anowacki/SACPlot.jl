@@ -24,8 +24,12 @@ export
 	plotsp,
 	psp
 
+const TIME_PICKS = [:t0, :t1, :t2, :t3, :t4, :t5, :t6, :t7, :t8, :t9]
+const NAME_PICKS = [:kt0, :kt1, :kt2, :kt3, :kt4, :kt5, :kt6, :kt7, :kt8, :kt9]
+
 @doc """
-`plot1(::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default)`
+`plot1(s::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default, title="")`
+`plot1(s::SACtr; args...)
 
 Create a plot of the SAC trace(s) `s`.
 
@@ -37,7 +41,8 @@ of values, or \"all\" to set all axes to have the same automatic limits.
 Define the text labels with an array of sumbols, which correspond to the names
 of SAC headers.
 """ ->
-function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default)
+function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default,
+               title="")
 	# Check arguments
 	check_lims(xlim, "SACPlot.plot1")
 	typeof(ylim) <: AbstractString || check_lims(ylim, "SACPlot.plot1")
@@ -54,10 +59,10 @@ function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default
 	n = length(a)
 	b, e, depmin, depmax = lims(a)
 	if ! isnan(xlim[1]); b = xlim[1]; end
-	if ! isnan(xlim[2]); e = xlim[2]; end
+	if ! isnan(xlim[end]); e = xlim[end]; end
 	if ! (typeof(ylim) <: AbstractString)
 		if ! isnan(ylim[1]); depmin = ylim[1]; end
-		if ! isnan(ylim[2]); depmax = ylim[2]; end
+		if ! isnan(ylim[end]); depmax = ylim[end]; end
 	end
 	# Turn off x labels for all but bottom trace
 	for i = 1:n
@@ -69,8 +74,18 @@ function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default
 		elseif ! all(isnan(ylim))
 			PyPlot.ylim([depmin, depmax])
 		end
-        # Add text annotation
         y1, y2 = PyPlot.ylim()
+        # Add picks
+        for (tp, kp) in zip(TIME_PICKS, NAME_PICKS)
+            t, k = getfield(a[i], tp), strip(getfield(a[i], kp))
+            if t != SAC.sac_rnull
+                PyPlot.plot([t, t], [y1, y2], "k-")
+                k != SAC.sac_cnull &&
+                    PyPlot.text(t, y1, k, horizontalalignment="left",
+                               verticalalignment="bottom")
+            end
+        end
+        # Add text annotation
         if label != :nothing
             if :default in label
                 if all(Bool[getfield(a[i], f) != SAC.sac_inull for f in [:nzyear, :nzhour, :nzmin, :nzsec, :nzmsec]])
@@ -95,6 +110,7 @@ function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default
                         horizontalalignment="right", verticalalignment="top",
                         fontsize=10)
         end
+        if i == 1; PyPlot.title(title); end
 	end
 	ticks = PyPlot.xticks()
     PyPlot.subplots_adjust(hspace=0.)
@@ -173,9 +189,9 @@ Plot the Fourier-transformed trace `S`, with frequencies `f`.
 """ ->
 function plotsp(f::Array{Array, 1}, S::Array{Array, 1}, kind="amp";
 				xlim=[NaN, NaN], ylim=[NaN, NaN])
+    error("`plotsp` is not implemented yet")
 	check_lims(xlim, "SACPlot.plotsp")
 	check_lims(ylim, "SACPlot.plotsp")
-    
 end
 psp = plotsp
 
