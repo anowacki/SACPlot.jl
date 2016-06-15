@@ -24,8 +24,8 @@ export
 	plotsp,
 	psp
 
-const TIME_PICKS = [:t0, :t1, :t2, :t3, :t4, :t5, :t6, :t7, :t8, :t9]
-const NAME_PICKS = [:kt0, :kt1, :kt2, :kt3, :kt4, :kt5, :kt6, :kt7, :kt8, :kt9]
+const TIME_PICKS = [:a, :t0, :t1, :t2, :t3, :t4, :t5, :t6, :t7, :t8, :t9, :f]
+const NAME_PICKS = [:ka, :kt0, :kt1, :kt2, :kt3, :kt4, :kt5, :kt6, :kt7, :kt8, :kt9, :kf]
 
 @doc """
 `plot1(s::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default, title="")`
@@ -80,6 +80,9 @@ function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default
             t, k = getfield(a[i], tp), strip(getfield(a[i], kp))
             if t != SAC.sac_rnull
                 PyPlot.plot([t, t], [y1, y2], "k-")
+                if tp in [:a, :f] && k == SAC.sac_cnull
+                    k = uppercase("$tp")
+                end
                 k != SAC.sac_cnull &&
                     PyPlot.text(t, y1, k, horizontalalignment="left",
                                verticalalignment="bottom")
