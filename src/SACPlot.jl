@@ -288,8 +288,6 @@ Throw an error if `a` is not a length-2 array with the first value lower
 or equal to the second, if both are not NaN.
 """
 function check_lims(a, routine="SACPlot.check_lims")
-	length(a) == 2 ||
-		error(routine * ": Plot limits must be given as length-2 array.")
 	a[1] > a[2] && # NB: (NaN {>,<,==} NaN) == false
 		error(routine * ": Lower plot limit value must be less than upper")
 end
