@@ -73,7 +73,7 @@ function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default
 		PyPlot.xlim([b, e])
 		if typeof(ylim) <: AbstractString
 			if lowercase(ylim) == "all" PyPlot.ylim([depmin, depmax]) end
-		elseif ! all(isnan(ylim))
+		elseif ! all([isnan(ylim[1]), isnan(ylim[end])])
 			PyPlot.ylim([depmin, depmax])
 		end
         y1, y2 = PyPlot.ylim()
