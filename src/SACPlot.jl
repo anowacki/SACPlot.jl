@@ -21,6 +21,8 @@ export
 	p2,
 	plotpm,
 	ppm,
+    plotrs,
+    prs,
 	plotsp,
 	psp
 
@@ -198,8 +200,68 @@ function plotsp(f::Array{Array, 1}, S::Array{Array, 1}, kind="amp";
 end
 psp = plotsp
 
+#TODO: Make plotting limits and automatic scaling more sensible when some traces
+#      have very different amplitudes
+#TODO: Allow for either a header or an array to be passed in for the delays.
+#      This means you don't need to fill in a header for this purpose.
+#TODO: Allow for either a header or an array to be passed in for the y-values.
+#      This would be useful to just plot in order, which is sometimes nice.
 @doc """
-`lims(::Array{SACtr}) -> b, e`
+`plotrs(s, hdr=:o; tw, dw, style="-r", size=1, y=:gcarc)`
+
+Plot a record section of the traces in `s`, aligned on the value in `hdr`.
+
+By default, the y-axis is distance (`:gcarc`), but this can by any header name
+passed as a symbol to the `y` keywords argument.
+
+## Keyword arguments
+
+|Name   |Type          |Description|
+|:------|:-------------|:----------|
+|`tw`   |Range or array|Set *time window* for plotting|
+|`dw`   |Range or array|Set *distance window* (or other y-axis variable) for plotting|
+|`style`|`String`      |Argument passed to PyPlot specifying style for lines|
+|`y`    |`Symbol`      |Header value to use for y-axis|
+|`size` |Real          |Scaling factor for traces|
+""" ->
+function plotrs(s::Array{SACtr}, hdr::Symbol=:none;
+        tw=[nothing, nothing], dw=[nothing, nothing], y::Symbol=:gcarc, style="-r",
+        size::Real=1.)
+    maxamp = maxabs([s[:depmax]; s[:depmin]])
+    scale = size*abs(minimum(s[y]) - maximum(s[y]))/10
+    d = zeros(length(s))
+    if hdr != :none
+        (hdr in SAC.sac_float_hdr) || error("`hdr` must be a float header name")
+        if !all(s[hdr] .== SAC.sac_rnull)
+            d[:] = -s[hdr]
+        else
+            error("Not all header values defined for $hdr")
+        end
+    end
+    PyPlot.clf()
+    for i in 1:length(s)
+        PyPlot.plot(SAC.time(s[i]) + d[i], getfield(s[i], y) + s[i].t*scale/maxamp, style)
+        t1, t2 = s[i].b + d[i], s[i].e + d[i]
+    end
+    t1 = minimum(s[:b] + d)
+    t2 = maximum(s[:e] + d)
+    if !(tw[1] == tw[2] == nothing)
+        tw[1] != nothing && (t1 = tw[1])
+        tw[end] != nothing && (t2 = tw[end])
+    end
+    PyPlot.xlim(t1, t2)
+    if !(dw[1] == dw[2] == nothing)
+        d1, d2 = PyPlot.ylim()
+        dw[1] != nothing && (d1 = dw[1])
+        dw[2] != nothing && (d2 = dw[2])
+        PyPlot.ylim(d1, d2)
+    end
+    return
+end
+prs = plotrs
+
+@doc """
+`lims(::Array{SACtr}) -> b, e, depmin, depmax`
 
 Get the minimum and maximum times, `b` and `e`, for an array of SAC traces
 """ ->
@@ -217,8 +279,7 @@ function lims(a::Array{SACtr})
 	end
 	return b, e, depmin, depmax
 end
-
-lims(s::SACtr) = lims([s])
+lims(s::SACtr) = s.b, s.e, s.depmin, s.depmax
 
 """
 `check_lims(a, routine=\"SACPlot.check_lims\")`
