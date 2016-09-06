@@ -207,7 +207,7 @@ psp = plotsp
 #TODO: Allow for either a header or an array to be passed in for the y-values.
 #      This would be useful to just plot in order, which is sometimes nice.
 @doc """
-`plotrs(s, hdr=:o; tw, dw, style="-r", size=1, y=:gcarc)`
+`plotrs(s, hdr=:o; tw, dw, style="-r", size=1, y=:gcarc, over=false)`
 
 Plot a record section of the traces in `s`, aligned on the value in `hdr`.
 
@@ -223,10 +223,11 @@ passed as a symbol to the `y` keywords argument.
 |`style`|`String`      |Argument passed to PyPlot specifying style for lines|
 |`y`    |`Symbol`      |Header value to use for y-axis|
 |`size` |Real          |Scaling factor for traces|
+|`over` |`Bool`        |If `true`, overplot this record section over the previous plot|
 """ ->
 function plotrs(s::Array{SACtr}, hdr::Symbol=:none;
         tw=[nothing, nothing], dw=[nothing, nothing], y::Symbol=:gcarc, style="-r",
-        size::Real=1.)
+        size::Real=1., over::Bool=false)
     maxamp = maxabs([s[:depmax]; s[:depmin]])
     scale = size*abs(minimum(s[y]) - maximum(s[y]))/10
     d = zeros(length(s))
@@ -238,7 +239,7 @@ function plotrs(s::Array{SACtr}, hdr::Symbol=:none;
             error("Not all header values defined for $hdr")
         end
     end
-    PyPlot.clf()
+    over || PyPlot.clf()
     for i in 1:length(s)
         PyPlot.plot(SAC.time(s[i]) + d[i], getfield(s[i], y) + s[i].t*scale/maxamp, style)
         t1, t2 = s[i].b + d[i], s[i].e + d[i]
