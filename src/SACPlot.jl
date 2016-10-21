@@ -202,17 +202,15 @@ psp = plotsp
 
 #TODO: Make plotting limits and automatic scaling more sensible when some traces
 #      have very different amplitudes
-#TODO: Allow for either a header or an array to be passed in for the delays.
-#      This means you don't need to fill in a header for this purpose.
-#TODO: Allow for either a header or an array to be passed in for the y-values.
-#      This would be useful to just plot in order, which is sometimes nice.
 @doc """
-`plotrs(s, hdr=:o; tw, dw, style="-r", size=1, y=:gcarc, over=false)`
+`plotrs(s, align=:o; tw, dw, style="-r", size=1, y=:gcarc, over=false)`
 
-Plot a record section of the traces in `s`, aligned on the value in `hdr`.
+Plot a record section of the traces in `s`, aligned on the time given by
+`align`.  This may be a header name, given as a Symbol, or an array of times.
 
 By default, the y-axis is distance (`:gcarc`), but this can by any header name
-passed as a symbol to the `y` keywords argument.
+passed as a symbol to the `y` keywords argument, or an arbitrary array of values
+(for instance, to plot equally spaced in some order).
 
 ## Keyword arguments
 
@@ -221,45 +219,47 @@ passed as a symbol to the `y` keywords argument.
 |`tw`   |Range or array|Set *time window* for plotting|
 |`dw`   |Range or array|Set *distance window* (or other y-axis variable) for plotting|
 |`style`|`String`      |Argument passed to PyPlot specifying style for lines|
-|`y`    |`Symbol`      |Header value to use for y-axis|
+|`y`    |`Symbol` or array|Header value or array of values to use for y-axis|
 |`size` |Real          |Scaling factor for traces|
 |`over` |`Bool`        |If `true`, overplot this record section over the previous plot|
 """ ->
-function plotrs(s::Array{SACtr}, hdr::Symbol=:none;
-        tw=[nothing, nothing], dw=[nothing, nothing], y::Symbol=:gcarc, style="-r",
+function plotrs(s::Array{SACtr}, align=0.;
+        tw=[nothing, nothing], dw=[nothing, nothing], y=:gcarc, style="-r",
         size::Real=1., over::Bool=false)
     maxamp = maxabs([s[:depmax]; s[:depmin]])
-    scale = size*abs(minimum(s[y]) - maximum(s[y]))/10
-    d = zeros(length(s))
-    if hdr != :none
-        (hdr in SAC.sac_float_hdr) || error("`hdr` must be a float header name")
-        if !all(s[hdr] .== SAC.sac_rnull)
-            d[:] = -s[hdr]
-        else
-            error("Not all header values defined for $hdr")
-        end
-    end
+    y_shift = _y_shifts(s, y)
+    d = _x_shifts(s, align)
+    scale = size*abs(minimum(y_shift) - maximum(y_shift))/10
     over || PyPlot.clf()
     for i in 1:length(s)
-        PyPlot.plot(SAC.time(s[i]) + d[i], getfield(s[i], y) + s[i].t*scale/maxamp, style)
+        PyPlot.plot(SAC.time(s[i]) + d[i], y_shift[i] + s[i].t*scale/maxamp, style)
         t1, t2 = s[i].b + d[i], s[i].e + d[i]
     end
     t1 = minimum(s[:b] + d)
     t2 = maximum(s[:e] + d)
-    if !(tw[1] == tw[2] == nothing)
+    if !(tw[1] == tw[end] == nothing)
         tw[1] != nothing && (t1 = tw[1])
         tw[end] != nothing && (t2 = tw[end])
     end
     PyPlot.xlim(t1, t2)
-    if !(dw[1] == dw[2] == nothing)
+    if !(dw[1] == dw[end] == nothing)
         d1, d2 = PyPlot.ylim()
         dw[1] != nothing && (d1 = dw[1])
-        dw[2] != nothing && (d2 = dw[2])
+        dw[end] != nothing && (d2 = dw[end])
         PyPlot.ylim(d1, d2)
     end
     return
 end
 prs = plotrs
+
+# Routines to calculate offsets in x and y for record section plots
+_y_shifts(s::Array{SACtr}, y::Symbol) = s[y]
+_y_shifts(s::Array{SACtr}, y::AbstractArray) =
+    length(y) == length(s) ? y : error("Length of `y` not the same as number of traces")
+_x_shifts(s::Array{SACtr}, t::Symbol) = -s[t]
+_x_shifts(s::Array{SACtr}, t::AbstractArray) =
+    length(s) == length(t) ? -t : error("Length of `align` not the same as number of traces")
+_x_shifts(s::Array{SACtr}, t::Real) = -t*ones(length(s))
 
 @doc """
 `lims(::Array{SACtr}) -> b, e, depmin, depmax`
