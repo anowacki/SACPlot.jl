@@ -217,24 +217,39 @@ passed as a symbol to the `y` keywords argument, or an arbitrary array of values
 |Name   |Type          |Description|
 |:------|:-------------|:----------|
 |`dw`   |Range or array|Set *distance window* (or other y-axis variable) for plotting|
+|`fill` |`Tuple`       |Set colour fill.  Pass a 2-tuple of (positive_colour, negative_colour)|
 |`over` |`Bool`        |If `true`, overplot this record section over the previous plot|
-|`reverse`|`Bool`      | If true, reverse the direction of the y-axis.  (Default for `y=:gcarc`)|
+|`reverse`|`Bool`      |If true, reverse the direction of the y-axis.  (Default for `y=:gcarc`)|
 |`tw`   |Range or array|Set *time window* for plotting|
 |`size` |Real          |Scaling factor for traces|
 |`style`|`String`      |Argument passed to PyPlot specifying style for lines|
 |`y`    |`Symbol` or array|Header value or array of values to use for y-axis|
 """ ->
 function plotrs(s::Array{SACtr}, align=0.;
-        tw=[nothing, nothing], dw=[nothing, nothing], y=:gcarc, style="-r",
-        size::Real=1., over::Bool=false, reverse=nothing)
+        tw=[nothing, nothing], dw=[nothing, nothing], y=:gcarc, style="-k",
+        size::Real=1., over::Bool=false, reverse=nothing, fill=(nothing, nothing))
     maxamp = maxabs([s[:depmax]; s[:depmin]])
     y_shift = _y_shifts(s, y)
     d = _x_shifts(s, align)
+    reverse = if reverse == nothing
+        if y == :gcarc true else false end
+    else
+        false
+    end
     scale = size*abs(minimum(y_shift) - maximum(y_shift))/10
+    reverse && (scale *= -1) # Set positive values to still plot 'up' the page if reversed axis
     over || PyPlot.clf()
     for i in 1:length(s)
-        PyPlot.plot(SAC.time(s[i]) + d[i], y_shift[i] + s[i].t*scale/maxamp, style)
-        t1, t2 = s[i].b + d[i], s[i].e + d[i]
+        t = SAC.time(s[i]) + d[i]
+        if fill[1] != nothing
+            PyPlot.fill_between(t, y_shift[i],
+                y_shift[i] + s[i].t*scale/maxamp, where=s[i].t.>0, facecolor=fill[1])
+        end
+        if fill[end] != nothing
+            PyPlot.fill_between(t, y_shift[i],
+                y_shift[i] + s[i].t*scale/maxamp, where=s[i].t.<0, facecolor=fill[end])
+        end
+        PyPlot.plot(t, y_shift[i] + s[i].t*scale/maxamp, style)
     end
     # x limits
     t1 = minimum(s[:b] + d)
@@ -251,7 +266,6 @@ function plotrs(s::Array{SACtr}, align=0.;
         dw[end] != nothing && (d2 = dw[end])
         PyPlot.ylim(d1, d2)
     end
-    reverse = (reverse == nothing && y == :gcarc) ? true : false
     if reverse
         d1, d2 = PyPlot.ylim()
         PyPlot.ylim(d2, d1)
