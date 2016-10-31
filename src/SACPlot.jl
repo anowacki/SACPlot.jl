@@ -216,16 +216,17 @@ passed as a symbol to the `y` keywords argument, or an arbitrary array of values
 
 |Name   |Type          |Description|
 |:------|:-------------|:----------|
-|`tw`   |Range or array|Set *time window* for plotting|
 |`dw`   |Range or array|Set *distance window* (or other y-axis variable) for plotting|
+|`over` |`Bool`        |If `true`, overplot this record section over the previous plot|
+|`reverse`|`Bool`      | If true, reverse the direction of the y-axis.  (Default for `y=:gcarc`)|
+|`tw`   |Range or array|Set *time window* for plotting|
+|`size` |Real          |Scaling factor for traces|
 |`style`|`String`      |Argument passed to PyPlot specifying style for lines|
 |`y`    |`Symbol` or array|Header value or array of values to use for y-axis|
-|`size` |Real          |Scaling factor for traces|
-|`over` |`Bool`        |If `true`, overplot this record section over the previous plot|
 """ ->
 function plotrs(s::Array{SACtr}, align=0.;
         tw=[nothing, nothing], dw=[nothing, nothing], y=:gcarc, style="-r",
-        size::Real=1., over::Bool=false)
+        size::Real=1., over::Bool=false, reverse=nothing)
     maxamp = maxabs([s[:depmax]; s[:depmin]])
     y_shift = _y_shifts(s, y)
     d = _x_shifts(s, align)
@@ -235,6 +236,7 @@ function plotrs(s::Array{SACtr}, align=0.;
         PyPlot.plot(SAC.time(s[i]) + d[i], y_shift[i] + s[i].t*scale/maxamp, style)
         t1, t2 = s[i].b + d[i], s[i].e + d[i]
     end
+    # x limits
     t1 = minimum(s[:b] + d)
     t2 = maximum(s[:e] + d)
     if !(tw[1] == tw[end] == nothing)
@@ -242,11 +244,17 @@ function plotrs(s::Array{SACtr}, align=0.;
         tw[end] != nothing && (t2 = tw[end])
     end
     PyPlot.xlim(t1, t2)
+    # y limits
     if !(dw[1] == dw[end] == nothing)
         d1, d2 = PyPlot.ylim()
         dw[1] != nothing && (d1 = dw[1])
         dw[end] != nothing && (d2 = dw[end])
         PyPlot.ylim(d1, d2)
+    end
+    reverse = (reverse == nothing && y == :gcarc) ? true : false
+    if reverse
+        d1, d2 = PyPlot.ylim()
+        PyPlot.ylim(d2, d1)
     end
     return
 end
