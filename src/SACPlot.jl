@@ -5,14 +5,9 @@ module SACPlot
 # Module for plotting SAC traces
 
 using SAC
-using PyPlot
+import Plots
 
 import SAC.SACtr
-import PyPlot.plot
-# For @doc doc strings
-if VERSION < v"0.4"
-	import Docile.@doc
-end
 
 export
 	plot1,
@@ -29,25 +24,28 @@ export
 const TIME_PICKS = [:a, :t0, :t1, :t2, :t3, :t4, :t5, :t6, :t7, :t8, :t9, :f]
 const NAME_PICKS = [:ka, :kt0, :kt1, :kt2, :kt3, :kt4, :kt5, :kt6, :kt7, :kt8, :kt9, :kf]
 
-@doc """
-`plot1(s::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default, title="")`
-`plot1(s::SACtr; args...)
+"""
+    plot1(s::Array{SACtr}; kwargs...) -> ::Plots.Plot
+    plot1(s::SACtr; kwargs...) -> ::Plots.Plot
 
-Create a plot of the SAC trace(s) `s`.
+Create a plot of the SAC trace(s) `s` and return a `Plots.Plot` object.
 
-Define limits in time with `xlim`
+## Keyword arguments
 
-Define dependent variable axis limits with `ylim`, which can be a 2-array
-of values, or \"all\" to set all axes to have the same automatic limits.
-
-Define the text labels with an array of sumbols, which correspond to the names
-of SAC headers.
-""" ->
+| Keyword | Example values | Description |
+|:--------|:---------------|:------------|
+|`label`  |`[:kcmpnm, :user0]`| A single or array of symbols listing the header values to show.|
+|`line`   |`(:black, 2)`   | An argument to Plots defining the line property to use.  Arrays will apply in turn to each trace.|
+|`xlim`   |`10:12`         | A range, tuple or array giving the limits in time to plot.  `NaN` as a limit uses the limits of the data.|
+|`ylim`   |`(NaN, 2e-9)`   | As for `xlim`, but controlling the y-axis.  `:all` will force all traces to have the same scale.|
+|`xlabel` |`"Time / s"`    | Set the independent axis label|
+|`ylabel` |`"Amplitude / nm"`| Set the dependent axis label|
+"""
 function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default,
-               title="")
+               title="", xlabel="Time / s", ylabel=nothing, line=(:black,))
 	# Check arguments
 	check_lims(xlim, "SACPlot.plot1")
-	typeof(ylim) <: AbstractString || check_lims(ylim, "SACPlot.plot1")
+	typeof(ylim) <: Union{String, Symbol} || check_lims(ylim, "SACPlot.plot1")
     # Make sure any single label is in an array
     typeof(label) == Symbol && (label = [label])
     for l in label
@@ -57,37 +55,38 @@ function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default
         end
     end
 	# Make plots
-	PyPlot.clf()
 	n = length(a)
 	b, e, depmin, depmax = lims(a)
 	if ! isnan(xlim[1]); b = xlim[1]; end
 	if ! isnan(xlim[end]); e = xlim[end]; end
-	if ! (typeof(ylim) <: AbstractString)
+	if ! (typeof(ylim) <: Union{String,Symbol})
 		if ! isnan(ylim[1]); depmin = ylim[1]; end
 		if ! isnan(ylim[end]); depmax = ylim[end]; end
 	end
 	# Turn off x labels for all but bottom trace
+    p = Plots.plot(layout=(n,1), grid=false, legend=false)
 	for i = 1:n
-		PyPlot.subplot(n, 1, i)
-		PyPlot.plot(SAC.time(a[i]), a[i].t)
-		PyPlot.xlim([b, e])
-		if typeof(ylim) <: AbstractString
-			if lowercase(ylim) == "all" PyPlot.ylim([depmin, depmax]) end
+        # Traces
+		Plots.plot!(p[i], SAC.time(a[i]), a[i].t, xlim=(b, e), xticks=(i==n ? true : false),
+            l=line)
+		if typeof(ylim) <: Union{String, Symbol}
+			if Symbol(lowercase(string(ylim))) == :all
+                Plots.ylims!(p[i], (depmin, depmax))
+            end
 		elseif ! all([isnan(ylim[1]), isnan(ylim[end])])
-			PyPlot.ylim([depmin, depmax])
+			Plots.ylims!(p[i], (depmin, depmax))
 		end
-        y1, y2 = PyPlot.ylim()
+        y1, y2 = Plots.ylims(p[i])
         # Add picks
         for (tp, kp) in zip(TIME_PICKS, NAME_PICKS)
             t, k = getfield(a[i], tp), strip(getfield(a[i], kp))
             if t != SAC.sac_rnull
-                PyPlot.plot([t, t], [y1, y2], "k-")
+                Plots.plot!(p[i], [t, t], [y1, y2], l=:black)
                 if tp in [:a, :f] && k == SAC.sac_cnull
                     k = uppercase("$tp")
                 end
                 k != SAC.sac_cnull &&
-                    PyPlot.text(t, y1, k, horizontalalignment="left",
-                               verticalalignment="bottom")
+                    Plots.plot!(p[i], ann=(t, y1, Plots.text(k, 8, :center, :black)))
             end
         end
         # Add text annotation
@@ -111,15 +110,14 @@ function plot1(a::Array{SACtr}; xlim=[NaN, NaN], ylim=[NaN, NaN], label=:default
                     label_string *= string(l) * ": " * strip(string(getfield(a[i], l))) * "\n"
                 end
             end
-            PyPlot.text(b+0.97*(e-b), y1+0.95*(y2-y1), label_string,
-                        horizontalalignment="right", verticalalignment="top",
-                        fontsize=10)
+            Plots.plot!(p[i], ann=(b+0.97*(e-b), y1+0.88*(y2-y1),
+                Plots.text(label_string, 8, :right, :black)), annotationguide=:below)
         end
-        if i == 1; PyPlot.title(title); end
-	end
-	ticks = PyPlot.xticks()
-    PyPlot.subplots_adjust(hspace=0.)
-	return
+	end    
+    title != nothing && Plots.title!(p[1], title)
+    xlabel != nothing && Plots.xlabel!(p[end], xlabel)
+    ylabel != nothing && Plots.ylabel!(p[end÷2], ylabel)
+	p
 end
 
 # Single-trace version
@@ -127,20 +125,18 @@ plot1(s::SACtr) = plot1([s])
 
 p1 = plot1
 
-@doc """
-`plot2(::Array{SACtr})`
+"""
+    plot2(::Array{SACtr})
 
 Plot all traces in array of SAC traces `a` on the same plot
-""" ->
+"""
 function plot2(a::Array{SACtr}; legend=false)
-	PyPlot.clf()
+    p = Plots.plot(legend=legend, show=false)
 	for i = 1:length(a)
-		PyPlot.plot(SAC.time(a[i]), a[i].t, "")
+		Plots.plot!(p, SAC.time(a[i]), a[i].t)
 	end
-	b, e = lims(a)
-	PyPlot.xlim([b, e])
-	PyPlot.tight_layout()
-	return
+	Plots.plot!(p, xlim=lims(a)[1:2], show=true)
+	p
 end
 
 # Single-trace version
@@ -148,12 +144,12 @@ plot2(s::SACtr) = plot2([s])
 
 p2 = plot2
 
-@doc """
-`plotpm(::Array{SACtr}; xlim=[NaN, NaN])`
+"""
+    plotpm(::Array{SACtr}; xlim=[NaN, NaN])
 
 Plot the particle motion for a pair of orthogonal components, within
 the time window `xlim[1]` to `xlim[2]` if provided
-""" ->
+"""
 function plotpm(a::Array{SACtr}; xlim=[NaN, NaN])
 	const angle_tol = 0.1
 	length(a) == 2 || error("plotpm: Can only plot two components")
@@ -166,23 +162,19 @@ function plotpm(a::Array{SACtr}; xlim=[NaN, NaN])
 	else
 		t1, t2 = a[2], a[1]
 	end
-	PyPlot.clf()
 	_, _, min, max = lims([t1, t2])
-	PyPlot.plot(t1.t, t2.t)
-	PyPlot.xlim(min, max)
-	PyPlot.ylim(min, max)
-	PyPlot.xlabel(strip(t1.kcmpnm) * " (" * string(t1.cmpaz) * ")")
-	PyPlot.ylabel(strip(t2.kcmpnm) * " (" * string(t2.cmpaz) * ")")
-	PyPlot.axis("square")
-	PyPlot.tight_layout()
-	return
+	p = Plots.plot(t1.t, t2.t, xlim=(min, max), ylim=(min, max),
+        aspect_ratio=:equal, legend=false)
+	Plots.xlabel!(p, strip(t1.kcmpnm) * " (" * string(t1.cmpaz) * ")")
+	Plots.ylabel!(p, strip(t2.kcmpnm) * " (" * string(t2.cmpaz) * ")")
+    p
 end
 
 plotpm(s1::SACtr, s2::SACtr; xlim=[NaN, NaN]) = plotpm([s1, s2]; xlim=xlim)
 ppm = plotpm
 
-@doc """
-`plotsp(f::Array, S::Array, kind=\"amp\")`
+"""
+    plotsp(f::Array, S::Array, kind=\"amp\")
 
 Plot the Fourier-transformed trace `S`, with frequencies `f`.
 
@@ -191,7 +183,7 @@ Plot the Fourier-transformed trace `S`, with frequencies `f`.
 `phase`: Plot phase\n
 `real` : Plot real part\n
 `imag` : Plot imaginary part\n
-""" ->
+"""
 function plotsp(f::Array{Array, 1}, S::Array{Array, 1}, kind="amp";
 				xlim=[NaN, NaN], ylim=[NaN, NaN])
     error("`plotsp` is not implemented yet")
@@ -202,8 +194,8 @@ psp = plotsp
 
 #TODO: Make plotting limits and automatic scaling more sensible when some traces
 #      have very different amplitudes
-@doc """
-`plotrs(s, align=:o; tw, dw, style="-r", size=1, y=:gcarc, over=false)`
+"""
+    plotrs(s, align=:o; tw, dw, style="-r", size=1, y=:gcarc, over=false)
 
 Plot a record section of the traces in `s`, aligned on the time given by
 `align`.  This may be a header name, given as a Symbol, or an array of times.
@@ -218,38 +210,56 @@ passed as a symbol to the `y` keywords argument, or an arbitrary array of values
 |:------|:-------------|:----------|
 |`dw`   |Range or array|Set *distance window* (or other y-axis variable) for plotting|
 |`fill` |`Tuple`       |Set colour fill.  Pass a 2-tuple of (positive_colour, negative_colour)|
+|`label`|`Symbol`      |Label traces with header value|
 |`over` |`Bool`        |If `true`, overplot this record section over the previous plot|
+|`qdp`  |`Bool`        |If `true`, reduce the number of points plotted for speed. (Default is automatic)|
 |`reverse`|`Bool`      |If true, reverse the direction of the y-axis.  (Default for `y=:gcarc`)|
 |`tw`   |Range or array|Set *time window* for plotting|
 |`size` |Real          |Scaling factor for traces|
-|`style`|`String`      |Argument passed to PyPlot specifying style for lines|
+|`line` |`Any`         |Argument passed to Plots specifying style for lines|
 |`y`    |`Symbol` or array|Header value or array of values to use for y-axis|
-""" ->
+"""
 function plotrs(s::Array{SACtr}, align=0.;
-        tw=[nothing, nothing], dw=[nothing, nothing], y=:gcarc, style="-k",
-        size::Real=1., over::Bool=false, reverse=nothing, fill=(nothing, nothing))
+        tw=[nothing, nothing], dw=[nothing, nothing], y=:gcarc, line=(:black,),
+        size::Real=1., over::Bool=false, reverse=nothing, fill=(nothing, nothing),
+        qdp=nothing, label=nothing,
+        kwargs...)
     maxamp = maxabs([s[:depmax]; s[:depmin]])
     y_shift = _y_shifts(s, y)
     d = _x_shifts(s, align)
     reverse = if reverse == nothing
         if y == :gcarc true else false end
     else
-        false
+        reverse
     end
     scale = size*abs(minimum(y_shift) - maximum(y_shift))/10
     reverse && (scale *= -1) # Set positive values to still plot 'up' the page if reversed axis
-    over || PyPlot.clf()
+    # Determine a limit on total number of points to plot
+    iskip = 1
+    if qdp != false
+        total_npts = sum(s[:npts])
+        iskip = max(1, total_npts÷50_000)
+    end
+    # Create plot here
+    over || Plots.plot(legend=false, grid=false, display=false)
+    # Traces
     for i in 1:length(s)
         t = SAC.time(s[i]) + d[i]
+        inds = 1:iskip:length(t)
+        # FIXME: Filled wiggles not working with Plots yet
+        any([fill[1], fill[2]] .!= nothing) && i == 1 && 
+            warn("Filled wiggles not implemented yet")
+        #=
         if fill[1] != nothing
-            PyPlot.fill_between(t, y_shift[i],
-                y_shift[i] + s[i].t*scale/maxamp, where=s[i].t.>0, facecolor=fill[1])
+            Plots.plot!(t[inds], (s[i].t[inds] + y_shift[i]).*[s[i].t[j] >= 0. ?
+                scale/maxamp : NaN for j in inds], fillrange=y_shift[i], c=fill[1])
         end
         if fill[end] != nothing
-            PyPlot.fill_between(t, y_shift[i],
-                y_shift[i] + s[i].t*scale/maxamp, where=s[i].t.<0, facecolor=fill[end])
+            Plots.plot!(t[inds], (s[i].t[inds] + y_shift[i]).*[s[i].t[j] <= 0. ?
+                scale/maxamp : NaN for j in inds], fillrange=y_shift[i], c=fill[end])
         end
-        PyPlot.plot(t, y_shift[i] + s[i].t*scale/maxamp, style)
+        =#
+        Plots.plot!(t[inds], y_shift[i] + s[i].t[inds]*scale/maxamp, l=line)
     end
     # x limits
     t1 = minimum(s[:b] + d)
@@ -258,18 +268,25 @@ function plotrs(s::Array{SACtr}, align=0.;
         tw[1] != nothing && (t1 = tw[1])
         tw[end] != nothing && (t2 = tw[end])
     end
-    PyPlot.xlim(t1, t2)
+    Plots.xlims!(t1, t2)
     # y limits
     if !(dw[1] == dw[end] == nothing)
-        d1, d2 = PyPlot.ylim()
+        d1, d2 = Plots.ylims()
         dw[1] != nothing && (d1 = dw[1])
         dw[end] != nothing && (d2 = dw[end])
-        PyPlot.ylim(d1, d2)
+        Plots.ylims!(d1, d2)
     end
-    if reverse
-        d1, d2 = PyPlot.ylim()
-        PyPlot.ylim(d2, d1)
+    reverse && Plots.yflip!()
+    # Labels
+    if label != nothing
+        t1, t2 = Plots.xlims()
+        for i in 1:length(s)
+            Plots.annotate!(t2, y_shift[i], Plots.text("$(s[i][label])", 8, :left, :black),
+                right_margin=10Plots.mm)
+        end
     end
+    # Ensure the border looks nice (not true with all backends)
+    draw_borders!(;display=true, kwargs...)
     return
 end
 prs = plotrs
@@ -283,11 +300,11 @@ _x_shifts(s::Array{SACtr}, t::AbstractArray) =
     length(s) == length(t) ? -t : error("Length of `align` not the same as number of traces")
 _x_shifts(s::Array{SACtr}, t::Real) = -t*ones(length(s))
 
-@doc """
-`lims(::Array{SACtr}) -> b, e, depmin, depmax`
+"""
+    lims(::Array{SACtr}) -> b, e, depmin, depmax
 
 Get the minimum and maximum times, `b` and `e`, for an array of SAC traces
-""" ->
+"""
 function lims(a::Array{SACtr})
 	n = length(a)
 	b = a[1].b
@@ -305,7 +322,7 @@ end
 lims(s::SACtr) = s.b, s.e, s.depmin, s.depmax
 
 """
-`check_lims(a, routine=\"SACPlot.check_lims\")`
+    check_lims(a, routine=\"SACPlot.check_lims\")
 
 Throw an error if `a` is not a length-2 array with the first value lower
 or equal to the second, if both are not NaN.
@@ -315,5 +332,23 @@ function check_lims(a, routine="SACPlot.check_lims")
 		error(routine * ": Lower plot limit value must be less than upper")
 end
 
+"""
+    draw_borders(line=(:black,1.5))
+
+Draw a border around the current plot.
+"""
+function draw_borders!(line=(:black,1.5); kwargs...)
+    (x1, x2), (y1, y2) = Plots.xlims(), Plots.ylims()
+    Plots.plot!([x1, x2, x2, x1, x1], [y1, y1, y2, y2, y1], l=line; kwargs...)
+end    
+
+"""
+    qdp_skip(s::Union{SACtr, Array{SACtr}}, thresh=50_000) -> iskip
+
+Return `iskip`, the inverse of the fraction of points to plot.  This routine
+"""
+function qdp_skip(s::Union{SACtr,Array{SACtr}}, thresh=50_000)
+    
+end
 
 end # module SACPlot
