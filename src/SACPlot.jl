@@ -39,6 +39,7 @@ Create a plot of the SAC trace(s) `s` and return a `Plots.Plot` object.
 |:----------|:---------------|:------------|
 |`label`    |`[:kcmpnm, :user0]`| A single or array of symbols listing the header values to show.|
 |`line`     |`(:black, 2)`   | An argument to Plots defining the line property to use.  Arrays will apply in turn to each trace.|
+|`over`     |`true`          | If `true`, plot on top of the active Plots plot object|
 |`qdp`      |`false`         | Plot every single sample if `false`.  (Default produces 'quick-and-dirty plot'.)|
 |`relative` |`true`, `:user0`| Plot all times relative to beginning of trace if `true` or a header value if a `Symbol`|
 |`xlim`     |`10:12`         | A range, tuple or array giving the limits in time to plot.  `NaN` as a limit uses the limits of the data.|
@@ -47,8 +48,8 @@ Create a plot of the SAC trace(s) `s` and return a `Plots.Plot` object.
 |`ylabel`   |`"Amplitude / nm"`| Set the dependent axis label|
 """
 function plot1(a::Array{SACtr};
-               label=:default, line=(:black,), qdp=true, relative=false,
-               title="", xlabel="Time / s", xlim=[NaN, NaN],
+               label=:default, line=(:black,), over=true; qdp=true,
+               relative=false, title="", xlabel="Time / s", xlim=[NaN, NaN],
                ylabel=nothing, ylim=[NaN, NaN])
     # Check arguments
     check_lims(xlim, "SACPlot.plot1")
@@ -73,7 +74,7 @@ function plot1(a::Array{SACtr};
     # Downsample plot
     iskip = qdp_skip(a, qdp)
     # Turn off x labels for all but bottom trace
-    p = Plots.plot(layout=(n,1), grid=false, legend=false)
+    p = over ? Plots.current() : Plots.plot(layout=(n,1), grid=false, legend=false)
     for i = 1:n
         # Which samples to plot
         inds = qdp_inds(a[i], iskip)
@@ -135,7 +136,7 @@ function plot1(a::Array{SACtr};
 end
 
 # Single-trace version
-plot1(s::SACtr) = plot1([s])
+plot1(s::SACtr; kwargs...) = plot1([s]; kwargs...)
 
 p1 = plot1
 
