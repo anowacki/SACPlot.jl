@@ -353,7 +353,7 @@ end
 
 Draw a border around the current plot.
 """
-function draw_borders!(p, line=(:black,1.5); kwargs...)
+function draw_borders!(p::Union{Plots.Plot,Plots.Subplot}, line=(:black,1.5); kwargs...)
     (x1, x2) = Plots.xlims(p)
     (y1, y2) = Plots.ylims(p)
     Plots.plot!(p, [x1, x2, x2, x1, x1], [y1, y1, y2, y2, y1], l=line; kwargs...)
