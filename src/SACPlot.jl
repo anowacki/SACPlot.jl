@@ -48,7 +48,7 @@ Create a plot of the SAC trace(s) `s` and return a `Plots.Plot` object.
 |`ylabel`   |`"Amplitude / nm"`| Set the dependent axis label|
 """
 function plot1(a::Array{SACtr};
-               label=:default, line=(:black,), over=true; qdp=true,
+               label=:default, line=(:black,), over=true, qdp=true,
                relative=false, title="", xlabel="Time / s", xlim=[NaN, NaN],
                ylabel=nothing, ylim=[NaN, NaN])
     # Check arguments
