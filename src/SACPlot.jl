@@ -141,16 +141,17 @@ plot1(s::SACtr; kwargs...) = plot1([s]; kwargs...)
 p1 = plot1
 
 """
-    plot2(::Array{SACtr})
+    plot2(::Array{SACtr}; relative=false)
 
 Plot all traces in array of SAC traces `a` on the same plot
 """
-function plot2(a::Array{SACtr}; legend=false)
+function plot2(a::Array{SACtr}; relative=false, legend=false)
     p = Plots.plot(legend=legend, show=false)
+    offset = relative ? a[:b] : zeros(length(a))
     for i = 1:length(a)
-        Plots.plot!(p, SAC.time(a[i]), a[i].t)
+        Plots.plot!(p, SAC.time(a[i]).-offset[i], a[i].t)
     end
-    Plots.plot!(p, xlim=lims(a)[1:2], show=true)
+    Plots.plot!(p, xlim=lims(a, relative)[1:2], show=true)
     p
 end
 
