@@ -8,16 +8,15 @@ module.
 
 
 ## How to install
-First install the unregistered package SAC.jl:
+First install the unregistered package SAC.jl and its dependencies, then
+Plots.jl, then finally the package itself:
 
 ```julia
+Pkg.add("Dierckx")
+Pkg.add("DSP")
+Pkg.add("Glob")
+Pkg.add("Plots")
 Pkg.clone("https://github.com/anowacki/SAC.jl")
-```
-
-Then SACPlot.jl can be added to your
-Julia install like so:
-
-```julia
 Pkg.clone("https://github.com/anowacki/SACPlot.jl")
 ```
 
@@ -32,21 +31,21 @@ and if that works, you're ready to go.
 
 ## How to use
 ### SAC.jl
-SACPlot.jl relies on the SAC.jl and PyPlot.jl packages, so make sure to install
+SACPlot.jl relies on the SAC.jl and [Plots.jl](https://github.com/JuliaPlots/Plots.jl) packages, so make sure to install
 these first (and their respective dependencies).
 
 ### Simple plots
 As an example, let's plot the sample data that comes with SAC.jl:
 
 ```julia
-julia> using SACPlot
+julia> using SAC, SACPlot
 
-julia> t=SAC.sample();
+julia> t = SAC.sample();
 
 julia> plot1(t)
 ```
 
-Assuming your PyPlot installation works, and you are in the REPL or another
+Assuming your Plots.jl installation works, and you are in the REPL or another
 interactive environment, you should see a plot:
 
 ![Plot of sample trace](docs/sample_plot.png)
@@ -54,30 +53,71 @@ interactive environment, you should see a plot:
 ### Plotting multiple traces
 Simply pass an array of traces in to `plot1` (also called `p1`).  The following
 example creates a set of traces showing the effect of changing the limit of a
-lowpass filter, ranging from 0.33&nbsp;Hz to 1.67&nbsp;Hz.  We put the corner
+lowpass filter, ranging from 0.33&nbsp;Hz to 10&nbsp;Hz.  We put the corner
 frequency in header variable `user0`, and pass the name of this variable as a
 symbol to the `plot1` method (`label=:user0`), which then shows this on the
 right of each plot.
 
 ```julia
-julia> using SAC
+julia> using SAC, SACPlot
 
-julia> function sample_plot()
-       A = SACtr[SAC.sample() for i in 1:5]
-       rtrend!(A)
-       taper!(A)
-       for (i, freq) in zip(eachindex(A), [1/3, 1, 3, 6, 10])
-           lowpass!(A[i], freq)
-	   A[i].user0 = freq
-       end
-       plot1(A, label=:user0)
-       end
-sample_plot (generic function with 1 method)
+julia> A = [SAC.sample() for i in 1:5]  |> rtrend! |> taper!
+5-element Array{SAC.SACtr,1}:
+ SAC.SACtr(delta=0.01, b=9.459999, npts=1000, kstnm=CDV, gcarc=3.357463, az=88.14708, baz=271.8529)
+ SAC.SACtr(delta=0.01, b=9.459999, npts=1000, kstnm=CDV, gcarc=3.357463, az=88.14708, baz=271.8529)
+ SAC.SACtr(delta=0.01, b=9.459999, npts=1000, kstnm=CDV, gcarc=3.357463, az=88.14708, baz=271.8529)
+ SAC.SACtr(delta=0.01, b=9.459999, npts=1000, kstnm=CDV, gcarc=3.357463, az=88.14708, baz=271.8529)
+ SAC.SACtr(delta=0.01, b=9.459999, npts=1000, kstnm=CDV, gcarc=3.357463, az=88.14708, baz=271.8529)
 
-julia> sample_plot()
+julia> freqs = [1/3, 1, 3, 6, 10];
+
+julia> A[:user0] = freqs;
+
+julia> lowpass!.(A, freqs);
+
+julia> p1(A)
 ```
 
 ![Plot of multiple traces](docs/multiple_traces.png)
+
+### Record sections
+Record sections are plotted with `plotrs`:
+
+Note that the y-axis variable is set using the keyword argument `y=<value>`,
+and defaults to `:gcarc`, the epicentral distance, as is usual for record
+sections.
+
+Aligning traces on a certain arrival, say, is as simple as passing a second
+argument to `prs`.  It can be a header `Symbol` (e.g., `:a`) or an array of
+numbers (e.g., `prs(A, :a)` or `prs(A, rand(length(A)))`).  Let's plot some
+data for the UK network from an event beneath Fiji, which has picks for the
+PKIKP phase in header `:a`:
+
+```julia
+julia> B = SAC.sample(:array); # Load sample data
+
+julia> B = cut(B, :a, -30, :a, 30); # Cut traces
+
+julia> Plots.default(size=(600,1000), margin=4Plots.mm) # Change the default figure size and margin
+
+julia> plotrs(B, :a, qdp=false, label=:kstnm, xlabel="Time rel. PKIKP / s", ylabel="Distance / °")
+```
+
+![Record section of UK network](docs/record_section.png)
+
+In this case we used the `label` keyword argument to label the traces by the
+station name (header `:kstnm`) and add labels to the axes.  We also turned off
+&lsquo;quick-and-dirty-plotting&rsquo; with the `qdp=false` option.
+
+`plotrs` can show traces against any header value or array passed in.  Here we
+plot the earlier example traces against frequency:
+
+```julia
+julia> plotrs(A, y=:user0, xlabel="Time / s", ylabel="Lowpass frequency / Hz")
+```
+
+![Record section plot of traces against frequency](docs/frequency_section.png)
+
 
 
 ## Getting help
@@ -102,11 +142,5 @@ search: plot1 plot2 plotsp plotpm SACPlot PyPlot prevfloat parsefloat PartialQui
 ```
 
 ## Dependencies
-- [SAC.jl](https://github.com/anowacki/SAC.jl)
-- [PyPlot.jl](https://github.com/stevengj/PyPlot.jl)
-
-Install these with the following commands:
-
-```julia
-Pkg.add("PyPlot"); Pkg.clone("https://github.com/anowacki/SAC.jl")
-```
+- [SAC.jl](https://github.com/anowacki/SAC.jl) (and its dependencies)
+- [Plots.jl](https://github.com/JuliaPlots/Plots.jl)
