@@ -257,7 +257,7 @@ function plotrs(s::Array{SACtr}, align=0.;
     # Determine a limit on total number of points to plot
     iskip = qdp_skip(s, qdp)
     # Create plot here
-    over || Plots.plot(legend=false, grid=false, display=false)
+    p = over ? Plots.current() : Plots.plot(legend=false, grid=false, display=false)
     # Traces
     for i in 1:length(s)
         t = SAC.time(s[i]) + d[i]
@@ -275,7 +275,7 @@ function plotrs(s::Array{SACtr}, align=0.;
                 scale/maxamp : NaN for j in inds], fillrange=y_shift[i], c=fill[end])
         end
         =#
-        Plots.plot!(t[inds], y_shift[i] + s[i].t[inds]*scale/maxamp, l=line)
+        Plots.plot!(p, t[inds], y_shift[i] + s[i].t[inds]*scale/maxamp, l=line)
     end
     # x limits
     t1 = minimum(s[:b] + d)
@@ -284,26 +284,26 @@ function plotrs(s::Array{SACtr}, align=0.;
         tw[1] != nothing && (t1 = tw[1])
         tw[end] != nothing && (t2 = tw[end])
     end
-    Plots.xlims!(t1, t2)
+    Plots.xlims!(p, t1, t2)
     # y limits
     if !(dw[1] == dw[end] == nothing)
-        d1, d2 = Plots.ylims()
+        d1, d2 = Plots.ylims(p)
         dw[1] != nothing && (d1 = dw[1])
         dw[end] != nothing && (d2 = dw[end])
-        Plots.ylims!(d1, d2)
+        Plots.ylims!(p, d1, d2)
     end
-    reverse && Plots.yflip!()
+    reverse && Plots.yflip!(p)
     # Labels
     if label != nothing
-        t1, t2 = Plots.xlims()
+        t1, t2 = Plots.xlims(p)
         for i in 1:length(s)
-            Plots.annotate!(t2, y_shift[i], Plots.text("$(s[i][label])", 8, :left, :black),
+            Plots.annotate!(p, t2, y_shift[i], Plots.text("$(s[i][label])", 8, :left, :black),
                 right_margin=10Plots.mm)
         end
     end
     # Ensure the border looks nice (not true with all backends)
-    draw_borders!(;display=true, kwargs...)
-    return
+    over || draw_borders!(; kwargs...)
+    p
 end
 prs = plotrs
 
@@ -355,7 +355,7 @@ function check_lims(a, routine="SACPlot.check_lims")
 end
 
 """
-    draw_borders(line=(:black,1))
+    draw_borders(p::Union{Plots.Plot,Plots.Subplot}, line=(:black,1); kwargs...) -> ::Plots.Plot
 
 Draw a border around the current plot.
 """
