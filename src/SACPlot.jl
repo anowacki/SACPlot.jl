@@ -17,9 +17,7 @@ export
     plotpm,
     ppm,
     plotrs,
-    prs,
-    plotsp,
-    psp
+    prs
 
 const TIME_PICKS = [:a, :t0, :t1, :t2, :t3, :t4, :t5, :t6, :t7, :t8, :t9, :f]
 const NAME_PICKS = [:ka, :kt0, :kt1, :kt2, :kt3, :kt4, :kt5, :kt6, :kt7, :kt8, :kt9, :kf]
@@ -137,6 +135,8 @@ end
 
 # Single-trace version
 plot1(s::SACtr; kwargs...) = plot1([s]; kwargs...)
+# Iterable which contains SAC traces
+plot1(args...; kwargs...) = plot1(SACtr[args...]; kwargs...)
 
 p1 = plot1
 
@@ -161,52 +161,56 @@ plot2(s::SACtr) = plot2([s])
 p2 = plot2
 
 """
-    plotpm(::Array{SACtr}; xlim=[NaN, NaN])
+    plotpm(::Array{SACtr}; xlim=[NaN, NaN], geog=false, kwargs...) -> ::Plots.Plot
 
 Plot the particle motion for a pair of orthogonal components, within
-the time window `xlim[1]` to `xlim[2]` if provided
+the time window `xlim[1]` to `xlim[2]` if provided.
+
+If `geog` is `true`, then plot the particle motion as relative to north,
+with north up the page, and mark on the component directions.
+
+Pass any further plotting commands to `Plots` with `kwargs...`.
 """
-function plotpm(a::Array{SACtr}; xlim=[NaN, NaN])
+function plotpm(a::Array{SACtr}; xlim=[NaN, NaN], geog=false, kwargs...)
     const angle_tol = 0.1
     length(a) == 2 || error("plotpm: Can only plot two components")
-    angle = (a[1].cmpaz - a[2].cmpaz)%360.
-    abs(angle) - 90. > eps(angle) && abs(angle) - 270. > eps(angle) &&
+    angle = SAC.angle_difference(a[1][:cmpaz], a[2][:cmpaz])
+    mod(angle - 90., 180.) <= angle_tol ||
         error("plotpm: Components must be orthogonal")
-    # Find out whether trace 1 is clockwise of 2, or vice versa
-    if abs(angle) - 90. <= angle_tol
+    # Set so that t1 is clockwise of t2 (e.g., t1 is E and t2 is N)
+    if angle - 90. <= angle_tol
         t1, t2 = a[1], a[2]
     else
         t1, t2 = a[2], a[1]
     end
-    _, _, amin, amax = lims([t1, t2])
-    p = Plots.plot(t1.t, t2.t, xlim=(amin, amax), ylim=(amin, amax),
-        aspect_ratio=:equal, legend=false)
-    Plots.xlabel!(p, strip(t1.kcmpnm) * " (" * string(t1.cmpaz) * ")")
-    Plots.ylabel!(p, strip(t2.kcmpnm) * " (" * string(t2.cmpaz) * ")")
+    amax = sqrt(maximum(a[1].t.^2 + a[2].t.^2))
+    p = Plots.plot(xlim=(-amax,amax), ylim=(-amax,amax), aspect_ratio=:equal,
+        legend=false, kwargs...)
+    if geog
+        az1, az2 = deg2rad(t1[:cmpaz]), deg2rad(t2[:cmpaz])
+        Plots.plot!(p, amax.*[sin(az1), 0, sin(az2)], amax.*[cos(az1), 0, cos(az2)],
+            line=(:darkgray, 2, :dash))
+        for t in (t1, t2)
+            rotation = mod(180-t[:cmpaz], 180) - 90
+            font = Plots.Font("sans-serif", 8, :hcenter, :bottom,
+                rotation, Plots.RGB(0.0,0.0,0.0))
+            Plots.annotate!(p, 0.5amax*sind(t[:cmpaz]), 0.5amax*cosd(t[:cmpaz]),
+                Plots.PlotText(t[:kcmpnm], font))
+        end
+        amp = sqrt.(t1.t.^2 + t2.t.^2)
+        phi = atan2.(t1.t, t2.t) # Angle from t2->t1 (e.g., N->E)
+        Plots.plot!(p, amp.*sin.(phi + az2), amp.*cos.(phi + az2),
+            xlabel="East", ylabel="North")
+    else
+        Plots.plot!(p, t1.t, t2.t,
+            xlabel=strip(t1.kcmpnm) * " (" * string(t1.cmpaz) * ")",
+            ylabel=strip(t2.kcmpnm) * " (" * string(t2.cmpaz) * ")")
+    end
     p
 end
 
-plotpm(s1::SACtr, s2::SACtr; xlim=[NaN, NaN]) = plotpm([s1, s2]; xlim=xlim)
+plotpm(s1::SACtr, s2::SACtr; kwargs...) = plotpm([s1, s2]; kwargs...)
 ppm = plotpm
-
-"""
-    plotsp(f::Array, S::Array, kind=\"amp\")
-
-Plot the Fourier-transformed trace `S`, with frequencies `f`.
-
-`kind` may be one of:\n
-`amp`  : Plot amplitude\n
-`phase`: Plot phase\n
-`real` : Plot real part\n
-`imag` : Plot imaginary part\n
-"""
-function plotsp(f::Array{Array, 1}, S::Array{Array, 1}, kind="amp";
-                xlim=[NaN, NaN], ylim=[NaN, NaN])
-    error("`plotsp` is not implemented yet")
-    check_lims(xlim, "SACPlot.plotsp")
-    check_lims(ylim, "SACPlot.plotsp")
-end
-psp = plotsp
 
 #TODO: Make plotting limits and automatic scaling more sensible when some traces
 #      have very different amplitudes
@@ -340,7 +344,7 @@ lims_offset(s::SACtr, relative::Bool) = relative ? s.b : zero(SAC.SACFloat)
 lims_offset(s::SACtr, relative::Symbol) = getfield(s, relative)
 
 """
-    check_lims(a, routine=\"SACPlot.check_lims\")
+    check_lims(a, routine="SACPlot.check_lims")
 
 Throw an error if `a` is not a length-2 array with the first value lower
 or equal to the second, if both are not NaN.
@@ -351,16 +355,16 @@ function check_lims(a, routine="SACPlot.check_lims")
 end
 
 """
-    draw_borders(line=(:black,1.5))
+    draw_borders(line=(:black,1))
 
 Draw a border around the current plot.
 """
-function draw_borders!(p::Union{Plots.Plot,Plots.Subplot}, line=(:black,1.5); kwargs...)
+function draw_borders!(p::Union{Plots.Plot,Plots.Subplot}, line=(:black,1); kwargs...)
     (x1, x2) = Plots.xlims(p)
     (y1, y2) = Plots.ylims(p)
     Plots.plot!(p, [x1, x2, x2, x1, x1], [y1, y1, y2, y2, y1], l=line; kwargs...)
 end
-draw_borders!(line=(:black, 1.5); kwargs...) =
+draw_borders!(line=(:black, 1); kwargs...) =
     draw_borders!(Plots.current(), line; kwargs...)
 
 """
