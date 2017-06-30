@@ -23,7 +23,7 @@ const TIME_PICKS = [:a, :t0, :t1, :t2, :t3, :t4, :t5, :t6, :t7, :t8, :t9, :f]
 const NAME_PICKS = [:ka, :kt0, :kt1, :kt2, :kt3, :kt4, :kt5, :kt6, :kt7, :kt8, :kt9, :kf]
 
 "Maximum number of samples to show by default"
-const sacplot_qdp_thresh = 10_000
+const sacplot_qdp_thresh = 100_000
 
 """
     plot1(s::Array{SACtr}; kwargs...) -> ::Plots.Plot
@@ -242,9 +242,9 @@ passed as a symbol to the `y` keywords argument, or an arbitrary array of values
 function plotrs(s::Array{SACtr}, align=0.;
         tw=[nothing, nothing], dw=[nothing, nothing], y=:gcarc, line=(:black,),
         size::Real=1., over::Bool=false, reverse=nothing, fill=(nothing, nothing),
-        qdp=10_000, label=nothing,
+        qdp=sacplot_qdp_thresh, label=nothing,
         kwargs...)
-    maxamp = maxabs([s[:depmax]; s[:depmin]])
+    maxamp = maximum(abs, [s[:depmax]; s[:depmin]])
     y_shift = _y_shifts(s, y)
     d = _x_shifts(s, align)
     reverse = if reverse == nothing
@@ -275,6 +275,10 @@ function plotrs(s::Array{SACtr}, align=0.;
                 scale/maxamp : NaN for j in inds], fillrange=y_shift[i], c=fill[end])
         end
         =#
+        # FIXME: Workaround for Plots on v0.6 not recognising t, which is a
+        #        StepRangeLen{Float32,Base.TwicePrecision{Float32},Base.TwicePrecision{Float32}}
+        #        on v0.6, but a (now deprecated) FloatRange{Float32} on v0.5.
+        VERSION > v"0.5" && (t = collect(t))
         Plots.plot!(p, t[inds], y_shift[i] + s[i].t[inds]*scale/maxamp, l=line)
     end
     # x limits
