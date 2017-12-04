@@ -38,6 +38,7 @@ Create a plot of the SAC trace(s) `s` and return a `Plots.Plot` object.
 |`label`    |`[:kcmpnm, :user0]`| A single or array of symbols listing the header values to show.|
 |`line`     |`(:black, 2)`   | An argument to Plots defining the line property to use.  Arrays will apply in turn to each trace.|
 |`over`     |`true`          | If `true`, plot on top of the active Plots plot object|
+|`picks`    |`(["SKS"], [1610])`| Add arrival time picks to plot from a tuple of two arrays, one giving the phase name and the second the arrival time.|
 |`qdp`      |`false`         | Plot every single sample if `false`.  (Default produces 'quick-and-dirty plot'.)|
 |`relative` |`true`, `:user0`| Plot all times relative to beginning of trace if `true` or a header value if a `Symbol`|
 |`xlim`     |`10:12`         | A range, tuple or array giving the limits in time to plot.  `NaN` as a limit uses the limits of the data.|
@@ -46,7 +47,7 @@ Create a plot of the SAC trace(s) `s` and return a `Plots.Plot` object.
 |`ylabel`   |`"Amplitude / nm"`| Set the dependent axis label|
 """
 function plot1(a::Array{SACtr};
-               label=:default, line=(:black,), over=false, qdp=true,
+               label=:default, line=(:black,), over=false, picks=([],[]), qdp=true,
                relative=false, title="", xlabel="Time / s", xlim=[NaN, NaN],
                ylabel=nothing, ylim=[NaN, NaN])
     # Check arguments
@@ -72,7 +73,8 @@ function plot1(a::Array{SACtr};
     # Downsample plot
     iskip = qdp_skip(a, qdp)
     # Turn off x labels for all but bottom trace
-    p = over ? Plots.current() : Plots.plot(layout=(n,1), grid=false, legend=false)
+    p = over ? Plots.current() : Plots.plot(layout=(n,1), grid=false, legend=false,
+        frame_style=:box)
     for i = 1:n
         # Which samples to plot
         inds = qdp_inds(a[i], iskip)
@@ -100,6 +102,20 @@ function plot1(a::Array{SACtr};
                 k != SAC.sac_cnull &&
                     Plots.plot!(p[i],
                         ann=(t, y1+0.05*(y2-y1), Plots.text(k, 8, :bottom, :left, :blue)))
+            end
+        end
+        # Add custom picks
+        phase_names, times = picks
+        length(times) == length(phase_names) ||
+            error("`picks` must be a tuple of phase name and time, with both arrays the same length")
+        if length(times) > 0
+            ilabel = 0
+            for (k, t) in zip(phase_names, times)
+                if b <= t <= e
+                    Plots.plot!(p[i], [t, t], [y1, y2], l=:red)
+                    Plots.plot!(p[i], ann=(t, y1+(1-0.05*ilabel)*(y2-y1), Plots.text(k, 8, :top, :left, :red)))
+                    ilabel = (ilabel + 1)%4
+                end
             end
         end
         # Add text annotation
