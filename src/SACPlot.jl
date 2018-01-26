@@ -24,7 +24,7 @@ export
     prs!
 
 const TIME_PICKS = [:a, :t0, :t1, :t2, :t3, :t4, :t5, :t6, :t7, :t8, :t9, :f]
-const NAME_PICKS = [:ka, :kt0, :kt1, :kt2, :kt3, :kt4, :kt5, :kt6, :kt7, :kt8, :kt9, :kf]
+const NAME_PICKS = Symbol.("k" .* String.(SACPlot.TIME_PICKS))
 
 "Maximum number of samples to show by default"
 const sacplot_qdp_thresh = 100_000
