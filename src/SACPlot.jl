@@ -7,7 +7,9 @@ module SACPlot
 using SAC
 import Plots
 
-import SAC.SACtr
+import SAC: SACtr
+
+const SACArray = AbstractArray{SACtr}
 
 export
     plot1,
@@ -17,13 +19,36 @@ export
     plotpm,
     ppm,
     plotrs,
-    prs
+    plotrs!,
+    prs,
+    prs!
 
 const TIME_PICKS = [:a, :t0, :t1, :t2, :t3, :t4, :t5, :t6, :t7, :t8, :t9, :f]
 const NAME_PICKS = [:ka, :kt0, :kt1, :kt2, :kt3, :kt4, :kt5, :kt6, :kt7, :kt8, :kt9, :kf]
 
 "Maximum number of samples to show by default"
 const sacplot_qdp_thresh = 100_000
+"Default plotting parameters for traces"
+const sacplot_p1_defaults = Dict{Symbol,Any}()
+"Default plotting parameters for record section"
+const sacplot_prs_defaults = Dict{Symbol,Any}()
+
+function __init__()
+    props = Dict(:legend => false,
+                 :grid => false,
+                 :display => false,
+                 :framestyle => :box)
+    for (k, v) in props
+        sacplot_p1_defaults[k] = v
+    end
+    props = Dict(:legend => false,
+                 :grid => false,
+                 :display => false,
+                 :framestyle => :box)
+    for (k, v) in props
+        sacplot_prs_defaults[k] = v
+    end
+end
 
 """
     plot1(s::Array{SACtr}; kwargs...) -> ::Plots.Plot
@@ -46,7 +71,7 @@ Create a plot of the SAC trace(s) `s` and return a `Plots.Plot` object.
 |`xlabel`   |`"Time / s"`    | Set the independent axis label|
 |`ylabel`   |`"Amplitude / nm"`| Set the dependent axis label|
 """
-function plot1(a::Array{SACtr};
+function plot1(a::SACArray;
                label=:default, line=(:black,), over=false, picks=([],[]), qdp=true,
                relative=false, title="", xlabel="Time / s", xlim=[NaN, NaN],
                ylabel=nothing, ylim=[NaN, NaN])
@@ -161,7 +186,7 @@ p1 = plot1
 
 Plot all traces in array of SAC traces `a` on the same plot
 """
-function plot2(a::Array{SACtr}; relative=false, legend=false)
+function plot2(a::SACArray; relative=false, legend=false)
     p = Plots.plot(legend=legend, show=false)
     offset = relative ? a[:b] : zeros(length(a))
     for i = 1:length(a)
@@ -187,7 +212,7 @@ with north up the page, and mark on the component directions.
 
 Pass any further plotting commands to `Plots` with `kwargs...`.
 """
-function plotpm(a::Array{SACtr}; xlim=[NaN, NaN], geog=false, kwargs...)
+function plotpm(a::SACArray; xlim=[NaN, NaN], geog=false, kwargs...)
     const angle_tol = 0.1
     length(a) == 2 || error("plotpm: Can only plot two components")
     angle = SAC.angle_difference(a[1][:cmpaz], a[2][:cmpaz])
@@ -231,7 +256,8 @@ ppm = plotpm
 #TODO: Make plotting limits and automatic scaling more sensible when some traces
 #      have very different amplitudes
 """
-    plotrs(s, align=:o; tw, dw, style="-r", size=1, y=:gcarc, over=false)
+    plotrs!(p::Plots.Plot, s, align=:o; plots_kwargs...) -> ::Plots.Plot
+    plotrs(s, align=:o; prs_kwargs..., plots_kwargs...) -> ::Plots.Plot
 
 Plot a record section of the traces in `s`, aligned on the time given by
 `align`.  This may be a header name, given as a Symbol, or an array of times.
@@ -240,24 +266,33 @@ By default, the y-axis is distance (`:gcarc`), but this can by any header name
 passed as a symbol to the `y` keywords argument, or an arbitrary array of values
 (for instance, to plot equally spaced in some order).
 
+Other plotting options are controlled by keywords arguments `prs_kwargs`:
+
 ## Keyword arguments
 
 |Name   |Type          |Description|
 |:------|:-------------|:----------|
 |`dw`   |Range or array|Set *distance window* (or other y-axis variable) for plotting|
 |`fill` |`Tuple`       |Set colour fill.  Pass a 2-tuple of (positive_colour, negative_colour)|
-|`label`|`Symbol`      |Label traces with header value|
-|`over` |`Bool`        |If `true`, overplot this record section over the previous plot|
+|`label`|`Symbol`      |Label traces with header value or array of values|
 |`qdp`  |`Bool`        |If `true`, reduce the number of points plotted for speed. (Default is automatic)|
-|`reverse`|`Bool`      |If true, reverse the direction of the y-axis.  (Default for `y=:gcarc`)|
+|`reverse`|`Bool`      |If `true`, reverse the direction of the y-axis.  (Default for `y=:gcarc`)|
 |`tw`   |Range or array|Set *time window* for plotting|
-|`size` |Real          |Scaling factor for traces|
+|`scale`|Real          |Scaling factor for traces (can be negative to reverse polarity)|
 |`line` |`Any`         |Argument passed to Plots specifying style for lines|
 |`y`    |`Symbol` or array|Header value or array of values to use for y-axis|
+
+Keyword arguments to be passed to Plots are those appended after any of the above;
+e.g., to plot a record section aligned on the `A` header, and set the size of the
+plot window using the Plots `size` argument, you can do:
+
+```
+julia> prs(sample(:array) |> cut(:a, -30, :a, 30), :a, scale=0.5, size=(500,1000))
+```
 """
-function plotrs(s::Array{SACtr}, align=0.;
+function plotrs!(p::Union{Plots.Plot,Plots.Subplot}, s::SACArray, align=0.;
         tw=[nothing, nothing], dw=[nothing, nothing], y=:gcarc, line=(:black,),
-        size::Real=1., over::Bool=false, reverse=nothing, fill=(nothing, nothing),
+        scale::Real=1.0, reverse=nothing, fill=(nothing, nothing),
         qdp=sacplot_qdp_thresh, label=nothing,
         kwargs...)
     maxamp = maximum(abs, [s[:depmax]; s[:depmin]])
@@ -268,12 +303,10 @@ function plotrs(s::Array{SACtr}, align=0.;
     else
         reverse
     end
-    scale = size*abs(minimum(y_shift) - maximum(y_shift))/10
+    scale = scale*abs(minimum(y_shift) - maximum(y_shift))/10
     reverse && (scale *= -1) # Set positive values to still plot 'up' the page if reversed axis
     # Determine a limit on total number of points to plot
     iskip = qdp_skip(s, qdp)
-    # Create plot here
-    p = over ? Plots.current() : Plots.plot(legend=false, grid=false, display=false)
     # Traces
     for i in 1:length(s)
         t = SAC.time(s[i]) + d[i]
@@ -315,26 +348,38 @@ function plotrs(s::Array{SACtr}, align=0.;
     reverse && Plots.yflip!(p)
     # Labels
     if label != nothing
+        label_text = if label isa AbstractArray
+            length(label) == length(s) ||
+                throw(ArgumentError("`label` vector must be same length as number of traces"))
+            string.(label)
+        elseif label isa Symbol
+            strip.(s[label])
+        else
+            throw(ArgumentError("Don't know how to plot labels for input: $label"))
+        end
         t1, t2 = Plots.xlims(p)
         for i in 1:length(s)
-            Plots.annotate!(p, t2, y_shift[i], Plots.text("$(s[i][label])", 8, :left, :black),
+            Plots.annotate!(p, t2, y_shift[i], Plots.text(label_text[i], 8, :left, :black),
                 right_margin=10Plots.mm)
         end
     end
-    # Ensure the border looks nice (not true with all backends)
-    over || draw_borders!(; kwargs...)
+    Plots.plot!(p; kwargs...)
     p
 end
+plotrs(s::SACArray, args...; kwargs...) =
+    plotrs!(Plots.plot(; sacplot_prs_defaults...), s, args...; kwargs...)
+prs! = plotrs!
 prs = plotrs
+@doc (@doc plotrs!) plotrs
 
 # Routines to calculate offsets in x and y for record section plots
-_y_shifts(s::Array{SACtr}, y::Symbol) = s[y]
-_y_shifts(s::Array{SACtr}, y::AbstractArray) =
+_y_shifts(s::SACArray, y::Symbol) = s[y]
+_y_shifts(s::SACArray, y::AbstractArray) =
     length(y) == length(s) ? y : error("Length of `y` not the same as number of traces")
-_x_shifts(s::Array{SACtr}, t::Symbol) = -s[t]
-_x_shifts(s::Array{SACtr}, t::AbstractArray) =
+_x_shifts(s::SACArray, t::Symbol) = -s[t]
+_x_shifts(s::SACArray, t::AbstractArray) =
     length(s) == length(t) ? -t : error("Length of `align` not the same as number of traces")
-_x_shifts(s::Array{SACtr}, t::Real) = -t*ones(length(s))
+_x_shifts(s::SACArray, t::Real) = -t*ones(length(s))
 
 """
     lims(::Array{SACtr}, relative=false) -> b, e, depmin, depmax
@@ -343,7 +388,7 @@ Get the minimum and maximum times, `b` and `e`, for an array of SAC traces.
 If `relative` is true, these times are all relative to the beginning of the trace,
 not the zero time.
 """
-function lims(a::Array{SACtr}, relative=false)
+function lims(a::SACArray, relative=false)
     n = length(a)
     offset = lims_offset(a[1], relative)
     b = a[1].b - offset
@@ -375,19 +420,6 @@ function check_lims(a, routine="SACPlot.check_lims")
 end
 
 """
-    draw_borders(p::Union{Plots.Plot,Plots.Subplot}, line=(:black,1); kwargs...) -> ::Plots.Plot
-
-Draw a border around the current plot.
-"""
-function draw_borders!(p::Union{Plots.Plot,Plots.Subplot}, line=(:black,1); kwargs...)
-    (x1, x2) = Plots.xlims(p)
-    (y1, y2) = Plots.ylims(p)
-    Plots.plot!(p, [x1, x2, x2, x1, x1], [y1, y1, y2, y2, y1], l=line; kwargs...)
-end
-draw_borders!(line=(:black, 1); kwargs...) =
-    draw_borders!(Plots.current(), line; kwargs...)
-
-"""
     qdp_inds(s::SACtr, iskip) -> inds
 
 Return `inds`, a range containing which indices to use for 'quick-and-dirty
@@ -401,10 +433,10 @@ qdp_inds(s::SACtr, iskip::Integer) = 1:min(iskip, s.npts-1):s.npts
 Return `iskip`, such that only the `iskip`th sample need be plotted when using
 'quick-and-dirty plotting'.
 """
-qdp_skip(a::Union{SACtr,Array{SACtr}}, thresh::Integer=sacplot_qdp_thresh) =
+qdp_skip(a::Union{SACtr,SACArray}, thresh::Integer=sacplot_qdp_thresh) =
     max(1, sum(a[:npts])÷thresh)
-qdp_skip(a::Union{SACtr,Array{SACtr}}, thresh::Void) = qdp_skip(a)
-qdp_skip(a::Union{SACtr,Array{SACtr}}, thresh::Bool) = thresh ? qdp_skip(a) : 1
+qdp_skip(a::Union{SACtr,SACArray}, thresh::Void) = qdp_skip(a)
+qdp_skip(a::Union{SACtr,SACArray}, thresh::Bool) = thresh ? qdp_skip(a) : 1
 
 
 end # module SACPlot
