@@ -4,6 +4,8 @@ SACPlot.jl provides routines for plotting SAC traces.
 module SACPlot
 # Module for plotting SAC traces
 
+import DSP
+
 using SAC
 import Plots
 
@@ -20,6 +22,7 @@ export
     ppm,
     plotrs,
     plotrs!,
+    plotspec,
     prs,
     prs!
 
@@ -74,7 +77,7 @@ Create a plot of the SAC trace(s) `s` and return a `Plots.Plot` object.
 function plot1(a::SACArray;
                label=:default, line=(:black,), over=false, picks=([],[]), qdp=true,
                relative=false, title="", xlabel="Time / s", xlim=[NaN, NaN],
-               ylabel=nothing, ylim=[NaN, NaN])
+               ylabel=nothing, ylim=[NaN, NaN], plots_kwargs...)
     # Check arguments
     check_lims(xlim, "SACPlot.plot1")
     typeof(ylim) <: Union{String, Symbol} || check_lims(ylim, "SACPlot.plot1")
@@ -99,7 +102,7 @@ function plot1(a::SACArray;
     iskip = qdp_skip(a, qdp)
     # Turn off x labels for all but bottom trace
     p = over ? Plots.current() : Plots.plot(layout=(n,1), grid=false, legend=false,
-        frame_style=:box)
+        frame_style=:box; plots_kwargs...)
     for i = 1:n
         # Which samples to plot
         inds = qdp_inds(a[i], iskip)
@@ -380,6 +383,44 @@ _x_shifts(s::SACArray, t::Symbol) = -s[t]
 _x_shifts(s::SACArray, t::AbstractArray) =
     length(s) == length(t) ? -t : error("Length of `align` not the same as number of traces")
 _x_shifts(s::SACArray, t::Real) = -t*ones(length(s))
+
+"""
+    plotspec(s::SACtr; len=trace_length/20, overlap=4len/5, trace=true, trace_frac, f=identity, plots_kwargs...) -> ::Plots.Plot
+
+Plot a spectrogram of the SAC trace `s` with windows of length `len` s which overlap by
+`overlap` s.
+
+By default, show the trace on a separate panel above the spectrogram; set `trace`
+to `false` to only return the plot of the spectrogram.  `trace_frac` sets the proportion
+of the plot to be taken up by the trace.  The power is trasformed by the function `f`
+elementwise.  (For example, to show the natural log, pass `f=log`.)
+
+`plots_kwargs...` are passed to the `Plots.heatmap` function which shows the spectrogram.
+"""
+function plotspec(s::SACtr;
+        len=(s[:e] - s[:b])/20, overlap=0.8len,
+        trace=true, trace_frac=0.3, f=identity, plot_kwargs...)
+    n = round(Int, len/s[:delta])
+    noverlap = clamp(round(Int, overlap/s[:delta]), 0, n-1)
+    spec = DSP.spectrogram(s.t, n, noverlap, fs=1/s.delta)
+    dspec = step(spec.time)/2
+    colours = Plots.cgrad([:white,:blue,:green,:yellow,:orange,:red])
+    pspec = Plots.heatmap(spec.time .+ s[:b], spec.freq, f.(spec.power),
+        xlabel="Time / s", ylabel="Frequency / Hz", cbar=false, c=colours,
+        framestyle=:box;
+        plot_kwargs...)
+    if trace
+        p = Plots.plot(
+            p1(cut(s, s[:b]+spec.time[1]-dspec, s[:b]+spec.time[end]+dspec), xlabel=""),
+            pspec,
+            layout=Plots.grid(2, 1, heights=(trace_frac, 1 - trace_frac)),
+            xticks=nothing # Remove time from all x-axes
+        )
+        Plots.plot!(p[end], xticks=:auto) # Add time only to bottom subplot x-axis
+    else
+        pspec
+    end
+end
 
 """
     lims(::Array{SACtr}, relative=false) -> b, e, depmin, depmax
