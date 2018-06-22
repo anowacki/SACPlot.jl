@@ -150,7 +150,7 @@ function plot1(a::SACArray;
         if label != :nothing
             if :default in label
                 if all(Bool[getfield(a[i], f) != SAC.sac_inull for f in [:nzyear, :nzhour, :nzmin, :nzsec, :nzmsec]])
-                    date = Date(Date(0) + Dates.Year(a[i].nzyear) + Dates.Day(a[i].nzjday))
+                    date = Date(Date(0) + Dates.Year(a[i].nzyear) + Dates.Day(a[i].nzjday - 1))
                     day = string(Dates.dayofmonth(date))
                     month = Dates.monthname(date)[1:3]
                 else
