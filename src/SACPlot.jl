@@ -4,6 +4,7 @@ SACPlot.jl provides routines for plotting SAC traces.
 module SACPlot
 # Module for plotting SAC traces
 
+using Compat.Dates
 import DSP
 
 using SAC

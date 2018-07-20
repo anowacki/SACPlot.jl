@@ -1,4 +1,5 @@
 julia 0.6
+Compat 0.69
 DSP
 Plots
 SAC
