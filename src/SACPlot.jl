@@ -217,7 +217,7 @@ with north up the page, and mark on the component directions.
 Pass any further plotting commands to `Plots` with `kwargs...`.
 """
 function plotpm(a::SACArray; xlim=[NaN, NaN], geog=false, kwargs...)
-    const angle_tol = 0.1
+    angle_tol = 0.1
     length(a) == 2 || error("plotpm: Can only plot two components")
     angle = SAC.angle_difference(a[1][:cmpaz], a[2][:cmpaz])
     mod(angle - 90., 180.) <= angle_tol ||
