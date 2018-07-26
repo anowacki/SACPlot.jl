@@ -5,6 +5,7 @@ module SACPlot
 
 using Compat.Dates
 using Compat.Printf
+import Compat: Nothing
 import DSP
 
 import Plots
@@ -477,7 +478,7 @@ Return `iskip`, such that only the `iskip`th sample need be plotted when using
 """
 qdp_skip(a::Union{SACtr,SACArray}, thresh::Integer=sacplot_qdp_thresh) =
     max(1, sum(a[:npts])÷thresh)
-qdp_skip(a::Union{SACtr,SACArray}, thresh::Void) = qdp_skip(a)
+qdp_skip(a::Union{SACtr,SACArray}, thresh::Nothing) = qdp_skip(a)
 qdp_skip(a::Union{SACtr,SACArray}, thresh::Bool) = thresh ? qdp_skip(a) : 1
 
 
