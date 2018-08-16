@@ -5,7 +5,7 @@ module SACPlot
 
 using Compat.Dates
 using Compat.Printf
-import Compat: Nothing
+import Compat: Nothing, @warn
 import DSP
 
 import Plots
@@ -258,6 +258,8 @@ end
 plotpm(s1::SACtr, s2::SACtr; kwargs...) = plotpm([s1, s2]; kwargs...)
 ppm = plotpm
 
+const _plotrs_first_run = Ref(true)
+
 #TODO: Make plotting limits and automatic scaling more sensible when some traces
 #      have very different amplitudes
 """
@@ -278,13 +280,13 @@ Other plotting options are controlled by keywords arguments `prs_kwargs`:
 |Name   |Type          |Description|
 |:------|:-------------|:----------|
 |`dw`   |Range or array|Set *distance window* (or other y-axis variable) for plotting|
-|`fill` |`Tuple`       |Set colour fill.  Pass a 2-tuple of (positive_colour, negative_colour)|
+|`fill` |`Tuple`       |Set colour fill.  Pass a 2-tuple of (positive_colour, negative_colour) or (pos, neg, level) to fill from/to a certain level between -1 and 1|
 |`label`|`Symbol`      |Label traces with header value or array of values|
 |`qdp`  |`Bool`        |If `true`, reduce the number of points plotted for speed. (Default is automatic)|
 |`reverse`|`Bool`      |If `true`, reverse the direction of the y-axis.  (Default for `y=:gcarc`)|
 |`tw`   |Range or array|Set *time window* for plotting|
 |`scale`|Real          |Scaling factor for traces (can be negative to reverse polarity)|
-|`line` |`Any`         |Argument passed to Plots specifying style for lines|
+|`line` |`Any`         |Argument passed to Plots specifying style for lines.  Use `false` to not plot lines.|
 |`y`    |`Symbol` or array|Header value or array of values to use for y-axis|
 
 Keyword arguments to be passed to Plots are those appended after any of the above;
@@ -314,26 +316,26 @@ function plotrs!(p::Union{Plots.Plot,Plots.Subplot}, s::SACArray, align=0.;
     iskip = qdp_skip(s, qdp)
     # Traces
     for i in 1:length(s)
-        t = SAC.time(s[i]) .+ d[i]
         inds = qdp_inds(s[i], iskip)
+        t = (SAC.time(s[i]) .+ d[i])[inds]
+        trace = y_shift[i] .+ s[i].t[inds].*scale/maxamp
         # FIXME: Filled wiggles not working with Plots yet
-        any([fill[1], fill[2]] .!= nothing) && i == 1 &&
-            warn("Filled wiggles not implemented yet")
-        #=
+        if _plotrs_first_run[] && any([fill[1], fill[2]] .!= nothing)
+            _plotrs_first_run[] = false
+            @warn("Filled wiggles do not display perfectly yet")
+        end
+            
+        fill_level = length(fill) >= 3 ? y_shift[i]+fill[3]*scale : y_shift[i]
         if fill[1] != nothing
-            Plots.plot!(t[inds], (s[i].t[inds] + y_shift[i]).*[s[i].t[j] >= 0. ?
-                scale/maxamp : NaN for j in inds], fillrange=y_shift[i], c=fill[1])
+            Plots.plot!(p, t, [tt  < fill_level ? tt : NaN for tt in trace],
+                fillrange=fill_level, c=fill[1], line=Plots.stroke(0))
         end
-        if fill[end] != nothing
-            Plots.plot!(t[inds], (s[i].t[inds] + y_shift[i]).*[s[i].t[j] <= 0. ?
-                scale/maxamp : NaN for j in inds], fillrange=y_shift[i], c=fill[end])
+        if fill[2] != nothing
+            Plots.plot!(p, t, [tt >= fill_level ? tt : NaN for tt in trace],
+                fillrange=fill_level, c=fill[2], line=Plots.stroke(0))
         end
-        =#
-        # FIXME: Workaround for Plots on v0.6 not recognising t, which is a
-        #        StepRangeLen{Float32,Base.TwicePrecision{Float32},Base.TwicePrecision{Float32}}
-        #        on v0.6, but a (now deprecated) FloatRange{Float32} on v0.5.
-        # VERSION > v"0.5" && (t = collect(t))
-        Plots.plot!(p, t[inds], y_shift[i] .+ s[i].t[inds].*scale/maxamp, l=line)
+        
+        line != false && Plots.plot!(p, t, trace, l=line)
     end
     # x limits
     t1 = minimum(s[:b] + d)
