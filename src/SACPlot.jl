@@ -300,7 +300,7 @@ function plotrs!(p::Union{Plots.Plot,Plots.Subplot}, s::SACArray, align=0.;
         scale::Real=1.0, reverse=nothing, fill=(nothing, nothing),
         qdp=sacplot_qdp_thresh, label=nothing,
         kwargs...)
-    maxamp = maximum(abs, [s[:depmax]; s[:depmin]])
+    maxamp = maximum(abs, (s[:depmax]; s[:depmin]))
     y_shift = _y_shifts(s, y)
     d = _x_shifts(s, align)
     reverse = if reverse == nothing
@@ -314,7 +314,7 @@ function plotrs!(p::Union{Plots.Plot,Plots.Subplot}, s::SACArray, align=0.;
     iskip = qdp_skip(s, qdp)
     # Traces
     for i in 1:length(s)
-        t = SAC.time(s[i]) + d[i]
+        t = SAC.time(s[i]) .+ d[i]
         inds = qdp_inds(s[i], iskip)
         # FIXME: Filled wiggles not working with Plots yet
         any([fill[1], fill[2]] .!= nothing) && i == 1 &&
@@ -332,8 +332,8 @@ function plotrs!(p::Union{Plots.Plot,Plots.Subplot}, s::SACArray, align=0.;
         # FIXME: Workaround for Plots on v0.6 not recognising t, which is a
         #        StepRangeLen{Float32,Base.TwicePrecision{Float32},Base.TwicePrecision{Float32}}
         #        on v0.6, but a (now deprecated) FloatRange{Float32} on v0.5.
-        VERSION > v"0.5" && (t = collect(t))
-        Plots.plot!(p, t[inds], y_shift[i] + s[i].t[inds]*scale/maxamp, l=line)
+        # VERSION > v"0.5" && (t = collect(t))
+        Plots.plot!(p, t[inds], y_shift[i] .+ s[i].t[inds].*scale/maxamp, l=line)
     end
     # x limits
     t1 = minimum(s[:b] + d)
