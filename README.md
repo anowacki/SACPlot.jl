@@ -6,18 +6,21 @@ A [Julia](http://julialang.org) package for plotting seismic data in the
 designed to work with the [SAC.jl](https://github.com/anowacki/SAC.jl)
 module.
 
+SACPlot.jl is compatitble with Julia v0.7+.
 
 ## How to install
-First install the unregistered package SAC.jl and its dependencies, then
-Plots.jl, then finally the package itself:
+First install the unregistered package SAC.jl:
 
 ```julia
-Pkg.add("Dierckx")
-Pkg.add("DSP")
-Pkg.add("Glob")
-Pkg.add("Plots")
-Pkg.clone("https://github.com/anowacki/SAC.jl")
-Pkg.clone("https://github.com/anowacki/SACPlot.jl")
+julia> import Pkg
+
+julia> Pkg.add("https://github.com/anowacki/SAC.jl")
+```
+
+Then you can install the package itself:
+
+```julia
+julia> Pkg.add("https://github.com/anowacki/SACPlot.jl")
 ```
 
 You then need only do
@@ -27,6 +30,9 @@ using SACPlot
 ```
 
 and if that works, you're ready to go.
+
+(Older versions of SACPlot compatible with Julia v0.6 can be installed like so:
+`Pkg.clone("https://github.com/anowacki/SAC.jl"); Pkg.clone("https://github.com/anowacki/SACPlot.jl")`.)
 
 
 ## How to use
@@ -98,7 +104,9 @@ julia> B = SAC.sample(:array); # Load sample data
 
 julia> B = cut(B, :a, -30, :a, 30); # Cut traces
 
-julia> Plots.default(size=(600,1000), margin=4Plots.mm) # Change the default figure size and margin
+julia> import Pkg; Pkg.add("Plots"); # This allows us to call Plots directly below
+
+julia> import Plots; Plots.default(size=(600,1000), margin=4Plots.mm) # Change the default figure size and margin
 
 julia> plotrs(B, :a, qdp=false, label=:kstnm, xlabel="Time rel. PKIKP / s", ylabel="Distance / °")
 ```
@@ -140,7 +148,3 @@ search: plot1 plot2 plotsp plotpm SACPlot PyPlot prevfloat parsefloat PartialQui
   Define the text labels with an array of sumbols, which correspond to the names of SAC
   headers.
 ```
-
-## Dependencies
-- [SAC.jl](https://github.com/anowacki/SAC.jl) (and its dependencies)
-- [Plots.jl](https://github.com/JuliaPlots/Plots.jl)

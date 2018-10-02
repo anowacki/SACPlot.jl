@@ -1,0 +1,10 @@
+name = "SACPlot"
+uuid = "6a547f00-c639-11e8-1a65-63d835c4ed59"
+authors = ["Andy Nowacki <a.nowacki@leeds.ac.uk>"]
+version = "0.3.0"
+
+[deps]
+DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"

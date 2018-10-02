@@ -3,9 +3,8 @@ SACPlot.jl provides routines for plotting SAC traces.
 """
 module SACPlot
 
-using Compat.Dates
-using Compat.Printf
-import Compat: Nothing, @warn
+using Dates
+using Printf
 import DSP
 
 import Plots
