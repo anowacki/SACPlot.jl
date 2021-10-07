@@ -1,3 +1,8 @@
+# SACPlot.jl is archived
+This repository has been archived as it is no longer being maintained.
+**No future development of SACPlot.jl will take place.**
+Please instead use [Seis.jl](https://github.com/anowacki/Seis.jl).
+
 # SACPlot.jl
 
 ## What is SACPlot.jl?
